@@ -12,6 +12,7 @@ Parse [OpenFGA](https://openfga.dev) DSL into `openfga-model` types and write si
 
 ```rust
 let model = openfga_language::parse("model\n  schema 1.1\n\ntype user")?;
+openfga_language::validate(&model)?;
 assert_eq!(model.schema_version, "1.1");
 assert_eq!(model.type_definitions[0].r#type, "user");
 assert_eq!(openfga_language::parse(&openfga_language::write(&model)?)?, model);
