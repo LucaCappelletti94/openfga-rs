@@ -9,5 +9,6 @@
 | Crate | What it holds |
 |---|---|
 | [`openfga-model`](crates/openfga-model) | The model types generated from `authzmodel.proto`, with protobuf binary and JSON encodings |
+| [`openfga-language`](crates/openfga-language) | The OpenFGA DSL parser and model lowering |
 
 Conformance tests read the pinned [openfga/language](https://github.com/openfga/language) corpus, so clone with `--recurse-submodules`.

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["codegen", "crates/openfga-model"]
+members = ["codegen", "crates/openfga-model", "crates/openfga-language"]
 
 [workspace.package]
 edition = "2024"
