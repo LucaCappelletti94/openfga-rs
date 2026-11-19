@@ -168,7 +168,11 @@ fn lower_rewrite(pair: Pair<'_, Rule>, restrictions: &mut Vec<RelationReference>
         Rule::recurse | Rule::recurse_no_direct => {
             return lower_rewrite(pair.into_inner().next().unwrap(), restrictions);
         }
-        Rule::relation_def | Rule::relation_def_no_direct => {
+        rule => {
+            assert!(matches!(
+                rule,
+                Rule::relation_def | Rule::relation_def_no_direct
+            ));
             let mut parts = pair.into_inner();
             let first = lower_rewrite(parts.next().unwrap(), restrictions);
             let Some(partials) = parts.next() else {
@@ -186,17 +190,16 @@ fn lower_rewrite(pair: Pair<'_, Rule>, restrictions: &mut Vec<RelationReference>
             match operator {
                 Rule::or => Rewrite::Union(Usersets { child: children }),
                 Rule::and => Rewrite::Intersection(Usersets { child: children }),
-                Rule::but_not => {
+                operator => {
+                    assert_eq!(operator, Rule::but_not);
                     let mut children = children.into_iter();
                     Rewrite::Difference(Box::new(Difference {
                         base: children.next().map(Box::new),
                         subtract: children.next().map(Box::new),
                     }))
                 }
-                _ => unreachable!("grammar supplies an operator"),
             }
         }
-        _ => unreachable!("grammar supplies a relation definition"),
     };
     Userset {
         userset: Some(rewrite),
@@ -236,65 +239,63 @@ fn lower_condition(pair: Pair<'_, Rule>, module: &str) -> Result<Condition, Pars
             ..ConditionMetadata::default()
         });
     }
-    for part in signature.chain(parts) {
-        match part.as_rule() {
-            Rule::condition_parameter => {
-                let mut parameter = part.into_inner();
-                let name = parameter.next().unwrap();
-                if condition.parameters.contains_key(name.as_str()) {
-                    return Err(error(
-                        &name,
-                        format!(
-                            "parameter '{}' is already defined in the condition '{}'",
-                            name.as_str(),
-                            condition.name
-                        ),
-                    ));
-                }
-                let mut types = parameter.next().unwrap().into_inner();
-                let outer = types.next().unwrap();
-                condition.parameters.insert(
-                    name.as_str().to_string(),
-                    ConditionParamTypeRef {
-                        type_name: type_number(outer.as_str()),
-                        generic_types: types
-                            .map(|generic| ConditionParamTypeRef {
-                                type_name: type_number(generic.as_str()),
-                                generic_types: Vec::new(),
-                            })
-                            .collect(),
-                    },
-                );
-            }
-            Rule::condition_expression => {
-                for token in part.into_inner() {
-                    if token.as_rule() != Rule::cel_comment {
-                        condition.expression.push_str(token.as_str());
-                    }
-                }
-                condition
-                    .expression
-                    .truncate(condition.expression.trim_end_matches('\n').len());
-            }
-            _ => {}
+    for part in signature {
+        let mut parameter = part.into_inner();
+        let name = parameter.next().unwrap();
+        if condition.parameters.contains_key(name.as_str()) {
+            return Err(error(
+                &name,
+                format!(
+                    "parameter '{}' is already defined in the condition '{}'",
+                    name.as_str(),
+                    condition.name
+                ),
+            ));
         }
+        let mut types = parameter.next().unwrap().into_inner();
+        let outer = types.next().unwrap();
+        condition.parameters.insert(
+            name.as_str().to_string(),
+            ConditionParamTypeRef {
+                type_name: type_number(outer.as_str()),
+                generic_types: types
+                    .map(|generic| ConditionParamTypeRef {
+                        type_name: type_number(generic.as_str()),
+                        generic_types: Vec::new(),
+                    })
+                    .collect(),
+            },
+        );
     }
+    let expression = parts.next().unwrap();
+    for token in expression.into_inner() {
+        condition.expression.push_str(token.as_str());
+    }
+    condition
+        .expression
+        .truncate(condition.expression.trim_end_matches('\n').len());
     Ok(condition)
 }
 
+/// Parameter types the grammar accepts, in `TypeName` order.
+const PARAMETER_TYPES: [TypeName; 10] = [
+    TypeName::Bool,
+    TypeName::String,
+    TypeName::Int,
+    TypeName::Uint,
+    TypeName::Double,
+    TypeName::Duration,
+    TypeName::Timestamp,
+    TypeName::Map,
+    TypeName::List,
+    TypeName::Ipaddress,
+];
+
+/// Maps a grammar parameter type keyword to its `TypeName` number.
 fn type_number(name: &str) -> i32 {
-    let name = match name {
-        "bool" => TypeName::Bool,
-        "string" => TypeName::String,
-        "int" => TypeName::Int,
-        "uint" => TypeName::Uint,
-        "double" => TypeName::Double,
-        "duration" => TypeName::Duration,
-        "timestamp" => TypeName::Timestamp,
-        "map" => TypeName::Map,
-        "list" => TypeName::List,
-        "ipaddress" => TypeName::Ipaddress,
-        _ => unreachable!("grammar supplies a parameter type"),
-    };
-    name.into()
+    PARAMETER_TYPES
+        .into_iter()
+        .find(|type_name| type_name.as_str_name()["TYPE_NAME_".len()..].eq_ignore_ascii_case(name))
+        .expect("the grammar accepts only known parameter types")
+        .into()
 }

@@ -62,3 +62,21 @@ fn condition_expression_preserves_visible_tokens() {
         "value == \"//{}\" \n  && value != \"\""
     );
 }
+
+#[test]
+fn condition_comments_preserve_surrounding_whitespace() {
+    let source = "model\n  schema 1.1\n\
+        condition active(value: bool) { // initial\n  // standalone\n  value // trailing\n}\n";
+    let expected: AuthorizationModel = serde_json::from_str(
+        r#"{
+            "schema_version": "1.1",
+            "conditions": {"active": {
+                "name": "active",
+                "expression": "\n  \n  value ",
+                "parameters": {"value": {"type_name": "TYPE_NAME_BOOL"}}
+            }}
+        }"#,
+    )
+    .unwrap();
+    assert_eq!(openfga_language::parse(source).unwrap(), expected);
+}

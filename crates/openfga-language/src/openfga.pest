@@ -19,7 +19,7 @@ model = _{ "model" ~ !identifier_tail }
 // OpenFGALexer.SCHEMA
 schema = _{ "schema" ~ !identifier_tail }
 // OpenFGALexer.SCHEMA_VERSION
-schema_version = @{ digit+ ~ "." ~ digit+ }
+schema_version = @{ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ }
 // OpenFGALexer.EXTEND
 extend = { "extend" ~ !identifier_tail }
 // OpenFGALexer.TYPE
@@ -42,14 +42,8 @@ punctuation = _{ "[" | "]" | "{" | "(" | ")" | "." | "-" | "!" | "?" | "+" | "*"
 cel_literal = _{ ("true" | "false" | "null") ~ !identifier_tail }
 // OpenFGALexer.BACKSLASH
 backslash = _{ "\\" }
-// OpenFGALexer.LETTER
-letter = _{ ASCII_ALPHA }
-// OpenFGALexer.DIGIT
-digit = _{ ASCII_DIGIT }
 // OpenFGALexer.EXPONENT
-exponent = _{ ("e" | "E") ~ ("+" | "-")? ~ digit+ }
-// OpenFGALexer.HEXDIGIT
-hex_digit = _{ ASCII_HEX_DIGIT }
+exponent = _{ ("e" | "E") ~ ("+" | "-")? ~ ASCII_DIGIT+ }
 // OpenFGALexer.RAW
 raw = _{ "r" | "R" }
 // OpenFGALexer.ESC_SEQ
@@ -59,19 +53,17 @@ escape_char = _{ backslash ~ ("a" | "b" | "f" | "n" | "r" | "t" | "v" | "\"" | "
 // OpenFGALexer.ESC_OCT_SEQ
 escape_octal = _{ backslash ~ '0'..'3' ~ '0'..'7' ~ '0'..'7' }
 // OpenFGALexer.ESC_BYTE_SEQ
-escape_byte = _{ backslash ~ ("x" | "X") ~ hex_digit{2} }
+escape_byte = _{ backslash ~ ("x" | "X") ~ ASCII_HEX_DIGIT{2} }
 // OpenFGALexer.ESC_UNI_SEQ
-escape_unicode = _{ backslash ~ ("u" ~ hex_digit{4} | "U" ~ hex_digit{8}) }
+escape_unicode = _{ backslash ~ ("u" ~ ASCII_HEX_DIGIT{4} | "U" ~ ASCII_HEX_DIGIT{8}) }
 // OpenFGALexer.WHITESPACE
 space = _{ ("\t" | " " | "\u{000C}")+ }
-// OpenFGALexer.CEL_COMMENT
-cel_comment = @{ "//" ~ (!"\n" ~ ANY)* }
 // OpenFGALexer.CEL_COMMENT hidden channel applies between default-mode tokens.
 COMMENT = _{ "//" ~ (!"\n" ~ ANY)* }
 // OpenFGALexer.NUM_FLOAT
-num_float = _{ digit+ ~ "." ~ digit+ ~ exponent? | digit+ ~ exponent | "." ~ digit+ ~ exponent? }
+num_float = _{ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ ~ exponent? | ASCII_DIGIT+ ~ exponent | "." ~ ASCII_DIGIT+ ~ exponent? }
 // OpenFGALexer.NUM_INT
-num_int = _{ "0x" ~ hex_digit+ | digit+ }
+num_int = _{ "0x" ~ ASCII_HEX_DIGIT+ | ASCII_DIGIT+ }
 // OpenFGALexer.NUM_UINT
 num_uint = _{ num_int ~ ("u" | "U") }
 // OpenFGALexer.STRING
@@ -81,11 +73,11 @@ bytes = _{ ("b" | "B") ~ string }
 // OpenFGALexer.DOLLAR_EXPRESSION
 dollar_expression = @{ "$expression" }
 // OpenFGALexer.IDENTIFIER
-identifier_token = @{ (letter | "_") ~ identifier_tail* }
+identifier_token = @{ (ASCII_ALPHA | "_") ~ identifier_tail* }
 // OpenFGALexer.IDENTIFIER continuation.
-identifier_tail = _{ letter | digit | "_" | "-" }
+identifier_tail = _{ ASCII_ALPHA | ASCII_DIGIT | "_" | "-" }
 // OpenFGALexer.EXTENDED_IDENTIFIER
-extended_token = @{ (letter | "_") ~ (("/" | "." | "-")? ~ (letter | digit | "_")+)* }
+extended_token = @{ (ASCII_ALPHA | "_") ~ (("/" | "." | "-")? ~ (ASCII_ALPHA | ASCII_DIGIT | "_")+)* }
 // OpenFGALexer.NEWLINE
 newline = @{ space? ~ ("\r\n" | "\n" | "\r" | "\u{000C}") ~ space? ~ newline? }
 // OpenFGALexer.CONDITION_DEF_END
@@ -113,13 +105,11 @@ relation_declaration = { (newline ~ multi_line_comment)? ~ newline ~ define ~ sp
 // OpenFGAParser.relationName
 relation_name = { extended_identifier }
 // OpenFGAParser.relationDef
-relation_def = { (direct_assignment | grouping | recurse) ~ partials? }
+relation_def = { (direct_assignment | rewrite | recurse) ~ partials? }
 // OpenFGAParser.relationDefNoDirect
-relation_def_no_direct = { (grouping | recurse_no_direct) ~ partials? }
+relation_def_no_direct = { (rewrite | recurse_no_direct) ~ partials? }
 // OpenFGAParser.relationDefPartials
-partials = { (space ~ or ~ space ~ (grouping | recurse_no_direct))+ | (space ~ and ~ space ~ (grouping | recurse_no_direct))+ | space ~ but_not ~ space ~ (grouping | recurse_no_direct) }
-// OpenFGAParser.relationDefGrouping
-grouping = _{ rewrite }
+partials = { (space ~ or ~ space ~ (rewrite | recurse_no_direct))+ | (space ~ and ~ space ~ (rewrite | recurse_no_direct))+ | space ~ but_not ~ space ~ (rewrite | recurse_no_direct) }
 // OpenFGAParser.relationRecurse
 recurse = { "(" ~ space? ~ (relation_def | recurse_no_direct) ~ space? ~ ")" }
 // OpenFGAParser.relationRecurseNoDirect
@@ -160,10 +150,10 @@ reserved = _{ (reserved_exclusive | "model" | "schema" | "type" | "relation" | "
 // OpenFGAParser.extended_identifier gives the longest extended token priority.
 extended_identifier = @{ &(identifier_token ~ ("/" | ".")) ~ extended_token | identifier }
 // OpenFGAParser.conditionExpression accepts default-mode tokens except RBRACE.
-condition_expression = { (cel_comment | expression_token)* }
+condition_expression = { expression_token* }
 // OpenFGAParser.conditionExpression token alternatives, including its complement branch.
 expression_token = @{ expression_condition | !condition_mode_start ~ (bytes | string | num_float | num_uint | num_int | extended_token | cel_operator | cel_literal | punctuation | dollar_expression | newline | space) }
 // OpenFGALexer.CONDITION pushes CONDITION_DEF even inside conditionExpression.
-condition_mode_start = _{ "condition" ~ !identifier_tail ~ !(("/" | ".") ~ (letter | digit | "_")) }
+condition_mode_start = _{ "condition" ~ !identifier_tail ~ !(("/" | ".") ~ (ASCII_ALPHA | ASCII_DIGIT | "_")) }
 // OpenFGALexer.CONDITION_DEF accepts only its tokens until CONDITION_DEF_END.
 expression_condition = _{ condition_mode_start ~ (identifier_token | space | "<" | ">" | "(" | ":" | ",")* ~ ")" }
