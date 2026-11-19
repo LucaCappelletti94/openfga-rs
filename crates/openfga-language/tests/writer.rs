@@ -100,3 +100,43 @@ fn condition_name_must_match_map_key() {
         "the 'active' condition has a different nested condition name ('other')",
     );
 }
+
+#[test]
+fn unknown_parameter_types_are_written_as_numbers() {
+    let mut model = AuthorizationModel {
+        schema_version: "1.1".into(),
+        ..Default::default()
+    };
+    model.conditions.insert(
+        "active".into(),
+        openfga_model::Condition {
+            name: "active".into(),
+            expression: "x".into(),
+            parameters: [
+                (
+                    "x".into(),
+                    openfga_model::ConditionParamTypeRef {
+                        type_name: 99,
+                        generic_types: Vec::new(),
+                    },
+                ),
+                (
+                    "y".into(),
+                    openfga_model::ConditionParamTypeRef {
+                        type_name: openfga_model::condition_param_type_ref::TypeName::List.into(),
+                        generic_types: vec![openfga_model::ConditionParamTypeRef {
+                            type_name: 42,
+                            generic_types: Vec::new(),
+                        }],
+                    },
+                ),
+            ]
+            .into(),
+            ..Default::default()
+        },
+    );
+    assert_eq!(
+        openfga_language::write(&model).unwrap(),
+        "model\n  schema 1.1\n\ncondition active(x: 99, y: list<42>) {\n  x\n}\n",
+    );
+}
