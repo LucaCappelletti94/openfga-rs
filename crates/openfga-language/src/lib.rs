@@ -4,8 +4,13 @@
 extern crate alloc;
 
 mod lowering;
+mod validation;
 mod writer;
 
+pub use validation::{
+    DslError, ErrorType, PositionRange, ValidationError, ValidationErrors, ValidationPosition,
+    validate, validate_dsl,
+};
 pub use writer::{WriteError, write};
 
 use alloc::string::{String, ToString};
