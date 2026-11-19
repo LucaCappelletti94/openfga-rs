@@ -4,6 +4,9 @@
 extern crate alloc;
 
 mod lowering;
+mod writer;
+
+pub use writer::{WriteError, write};
 
 use alloc::string::{String, ToString};
 use openfga_model::AuthorizationModel;

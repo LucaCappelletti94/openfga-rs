@@ -8,11 +8,12 @@
 
 Not published yet, so the crates.io and docs.rs badges resolve after the first release.
 
-Parse [OpenFGA](https://openfga.dev) DSL into `openfga-model` types with `no_std` and `alloc`.
+Parse [OpenFGA](https://openfga.dev) DSL into `openfga-model` types and write single-file models as DSL with `no_std` and `alloc`.
 
 ```rust
 let model = openfga_language::parse("model\n  schema 1.1\n\ntype user")?;
 assert_eq!(model.schema_version, "1.1");
 assert_eq!(model.type_definitions[0].r#type, "user");
-# Ok::<(), openfga_language::ParseError>(())
+assert_eq!(openfga_language::parse(&openfga_language::write(&model)?)?, model);
+# Ok::<(), Box<dyn std::error::Error>>(())
 ```
