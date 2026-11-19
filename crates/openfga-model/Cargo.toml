@@ -1,0 +1,23 @@
+[package]
+name = "openfga-model"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "OpenFGA authorization model types with protobuf and JSON encodings, for no_std"
+readme = "README.md"
+documentation = "https://docs.rs/openfga-model"
+keywords = ["openfga", "authorization", "zanzibar", "protobuf", "no-std"]
+categories = ["authentication", "encoding", "no-std"]
+
+[dependencies]
+prost = { version = "0.14.1", default-features = false, features = ["derive"] }
+serde = { version = "1.0.225", default-features = false, features = ["alloc"] }
+
+[dev-dependencies]
+serde_json = "1.0.110"
+
+[lints]
+workspace = true

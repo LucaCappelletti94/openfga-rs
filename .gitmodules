@@ -1,0 +1,3 @@
+[submodule "conformance/openfga-language"]
+	path = conformance/openfga-language
+	url = https://github.com/openfga/language
