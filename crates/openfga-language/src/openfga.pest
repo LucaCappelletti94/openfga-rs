@@ -1,0 +1,169 @@
+// OpenFGALexer.HASH
+hash = _{ "#" }
+// OpenFGALexer.COLON
+colon = _{ ":" }
+// OpenFGALexer.COMMA
+comma = _{ "," }
+// OpenFGALexer.AND
+and = { "and" ~ !identifier_tail }
+// OpenFGALexer.OR
+or = { "or" ~ !identifier_tail }
+// OpenFGALexer.BUT_NOT
+but_not = { "but not" ~ !identifier_tail }
+// OpenFGALexer.FROM
+from = _{ "from" ~ !identifier_tail }
+// OpenFGALexer.MODULE
+module = _{ "module" ~ !identifier_tail }
+// OpenFGALexer.MODEL
+model = _{ "model" ~ !identifier_tail }
+// OpenFGALexer.SCHEMA
+schema = _{ "schema" ~ !identifier_tail }
+// OpenFGALexer.SCHEMA_VERSION
+schema_version = @{ digit+ ~ "." ~ digit+ }
+// OpenFGALexer.EXTEND
+extend = { "extend" ~ !identifier_tail }
+// OpenFGALexer.TYPE
+type_keyword = _{ "type" ~ !identifier_tail }
+// OpenFGALexer.CONDITION
+condition_keyword = _{ "condition" ~ !identifier_tail }
+// OpenFGALexer.RELATIONS
+relations = _{ "relations" ~ !identifier_tail }
+// OpenFGALexer.RELATION
+relation = _{ "relation" ~ !identifier_tail }
+// OpenFGALexer.DEFINE
+define = _{ "define" ~ !identifier_tail }
+// OpenFGALexer.KEYWORD_WITH
+with = _{ "with" ~ !identifier_tail }
+// OpenFGALexer.EQUALS, NOT_EQUALS, IN, LESS, LESS_EQUALS, GREATER_EQUALS, GREATER, LOGICAL_AND, LOGICAL_OR
+cel_operator = _{ "==" | "!=" | "in" ~ !identifier_tail | "<=" | ">=" | "<" | ">" | "&&" | "||" }
+// OpenFGALexer.LBRACKET, RPRACKET, LBRACE, RBRACE, LPAREN, RPAREN, DOT, MINUS, EXCLAM, QUESTIONMARK, PLUS, STAR, SLASH, PERCENT
+punctuation = _{ "[" | "]" | "{" | "(" | ")" | "." | "-" | "!" | "?" | "+" | "*" | "/" | "%" | ":" | "," | "#" }
+// OpenFGALexer.CEL_TRUE, CEL_FALSE, NUL
+cel_literal = _{ ("true" | "false" | "null") ~ !identifier_tail }
+// OpenFGALexer.BACKSLASH
+backslash = _{ "\\" }
+// OpenFGALexer.LETTER
+letter = _{ ASCII_ALPHA }
+// OpenFGALexer.DIGIT
+digit = _{ ASCII_DIGIT }
+// OpenFGALexer.EXPONENT
+exponent = _{ ("e" | "E") ~ ("+" | "-")? ~ digit+ }
+// OpenFGALexer.HEXDIGIT
+hex_digit = _{ ASCII_HEX_DIGIT }
+// OpenFGALexer.RAW
+raw = _{ "r" | "R" }
+// OpenFGALexer.ESC_SEQ
+escape = _{ escape_char | escape_byte | escape_unicode | escape_octal }
+// OpenFGALexer.ESC_CHAR_SEQ
+escape_char = _{ backslash ~ ("a" | "b" | "f" | "n" | "r" | "t" | "v" | "\"" | "'" | "\\" | "?" | "`") }
+// OpenFGALexer.ESC_OCT_SEQ
+escape_octal = _{ backslash ~ '0'..'3' ~ '0'..'7' ~ '0'..'7' }
+// OpenFGALexer.ESC_BYTE_SEQ
+escape_byte = _{ backslash ~ ("x" | "X") ~ hex_digit{2} }
+// OpenFGALexer.ESC_UNI_SEQ
+escape_unicode = _{ backslash ~ ("u" ~ hex_digit{4} | "U" ~ hex_digit{8}) }
+// OpenFGALexer.WHITESPACE
+space = _{ ("\t" | " " | "\u{000C}")+ }
+// OpenFGALexer.CEL_COMMENT
+cel_comment = @{ "//" ~ (!"\n" ~ ANY)* }
+// OpenFGALexer.CEL_COMMENT hidden channel applies between default-mode tokens.
+COMMENT = _{ "//" ~ (!"\n" ~ ANY)* }
+// OpenFGALexer.NUM_FLOAT
+num_float = _{ digit+ ~ "." ~ digit+ ~ exponent? | digit+ ~ exponent | "." ~ digit+ ~ exponent? }
+// OpenFGALexer.NUM_INT
+num_int = _{ "0x" ~ hex_digit+ | digit+ }
+// OpenFGALexer.NUM_UINT
+num_uint = _{ num_int ~ ("u" | "U") }
+// OpenFGALexer.STRING
+string = _{ raw ~ ("\"\"\"" ~ (!"\"\"\"" ~ ANY)* ~ "\"\"\"" | "'''" ~ (!"'''" ~ ANY)* ~ "'''" | "\"" ~ (!("\"" | "\n" | "\r") ~ ANY)* ~ "\"" | "'" ~ (!("'" | "\n" | "\r") ~ ANY)* ~ "'") | "\"\"\"" ~ (escape | !("\\" | "\"\"\"") ~ ANY)* ~ "\"\"\"" | "'''" ~ (escape | !("\\" | "'''") ~ ANY)* ~ "'''" | "\"" ~ (escape | !("\\" | "\"" | "\n" | "\r") ~ ANY)* ~ "\"" | "'" ~ (escape | !("\\" | "'" | "\n" | "\r") ~ ANY)* ~ "'" }
+// OpenFGALexer.BYTES
+bytes = _{ ("b" | "B") ~ string }
+// OpenFGALexer.DOLLAR_EXPRESSION
+dollar_expression = @{ "$expression" }
+// OpenFGALexer.IDENTIFIER
+identifier_token = @{ (letter | "_") ~ identifier_tail* }
+// OpenFGALexer.IDENTIFIER continuation.
+identifier_tail = _{ letter | digit | "_" | "-" }
+// OpenFGALexer.EXTENDED_IDENTIFIER
+extended_token = @{ (letter | "_") ~ (("/" | "." | "-")? ~ (letter | digit | "_")+)* }
+// OpenFGALexer.NEWLINE
+newline = @{ space? ~ ("\r\n" | "\n" | "\r" | "\u{000C}") ~ space? ~ newline? }
+// OpenFGALexer.CONDITION_DEF_END
+condition_end = _{ ")" }
+// OpenFGALexer.CONDITION_PARAM_CONTAINER
+container = @{ ("map" | "list") ~ !identifier_tail }
+// OpenFGALexer.CONDITION_PARAM_TYPE
+primitive = @{ ("bool" | "string" | "int" | "uint" | "double" | "duration" | "timestamp" | "ipaddress") ~ !identifier_tail }
+// OpenFGALexer.CONDITION_PARAM_TYPE_LESS, CONDITION_PARAM_TYPE_GREATER
+parameter_generic = _{ "<" ~ primitive ~ ">" }
+// OpenFGALexer.CONDITION_OPEN, CONDITION_COLON, CONDITION_COMMA, CONDITION_WS are literal delimiters and space below.
+// OpenFGALexer.CONDITION_NAME
+condition_identifier = @{ !(container | primitive) ~ identifier_token }
+// OpenFGAParser.main
+main = { SOI ~ space? ~ newline? ~ (model_header | module_header) ~ type_def* ~ condition* ~ newline? ~ EOI }
+// OpenFGAParser.modelHeader
+model_header = { (multi_line_comment ~ newline)? ~ model ~ newline ~ schema ~ space ~ schema_version ~ space? }
+// OpenFGAParser.moduleHeader
+module_header = { (multi_line_comment ~ newline)? ~ module ~ space ~ identifier ~ space? }
+// OpenFGAParser.typeDefs is represented by type_def* in main.
+// OpenFGAParser.typeDef
+type_def = { (newline ~ multi_line_comment)? ~ newline ~ (extend ~ space)? ~ type_keyword ~ space ~ extended_identifier ~ (newline ~ relations ~ relation_declaration+)? }
+// OpenFGAParser.relationDeclaration
+relation_declaration = { (newline ~ multi_line_comment)? ~ newline ~ define ~ space ~ relation_name ~ space? ~ colon ~ space? ~ relation_def }
+// OpenFGAParser.relationName
+relation_name = { extended_identifier }
+// OpenFGAParser.relationDef
+relation_def = { (direct_assignment | grouping | recurse) ~ partials? }
+// OpenFGAParser.relationDefNoDirect
+relation_def_no_direct = { (grouping | recurse_no_direct) ~ partials? }
+// OpenFGAParser.relationDefPartials
+partials = { (space ~ or ~ space ~ (grouping | recurse_no_direct))+ | (space ~ and ~ space ~ (grouping | recurse_no_direct))+ | space ~ but_not ~ space ~ (grouping | recurse_no_direct) }
+// OpenFGAParser.relationDefGrouping
+grouping = _{ rewrite }
+// OpenFGAParser.relationRecurse
+recurse = { "(" ~ space? ~ (relation_def | recurse_no_direct) ~ space? ~ ")" }
+// OpenFGAParser.relationRecurseNoDirect
+recurse_no_direct = { "(" ~ space? ~ (relation_def_no_direct | recurse_no_direct) ~ space? ~ ")" }
+// OpenFGAParser.relationDefDirectAssignment
+direct_assignment = { "[" ~ space? ~ restriction ~ space? ~ (comma ~ space? ~ restriction ~ space?)* ~ "]" }
+// OpenFGAParser.relationDefRewrite
+rewrite = { extended_identifier ~ (space ~ from ~ space ~ extended_identifier)? }
+// OpenFGAParser.relationDefTypeRestriction
+restriction = { newline? ~ restriction_base ~ (space ~ with ~ space ~ (condition_name | dollar_expression))? ~ newline? }
+// OpenFGAParser.relationDefTypeRestrictionBase
+restriction_base = { extended_identifier ~ (wildcard | relation_restriction)? }
+// OpenFGAParser.relationDefTypeRestrictionBase wildcard branch.
+wildcard = { ":*" }
+// OpenFGAParser.relationDefTypeRestrictionBase relation branch.
+relation_restriction = { hash ~ extended_identifier }
+// OpenFGAParser.conditions is represented by condition* in main.
+// OpenFGAParser.condition
+condition = { (newline ~ multi_line_comment)? ~ newline ~ condition_signature ~ space? ~ "{" ~ newline? ~ space? ~ condition_expression ~ "}" }
+// OpenFGAParser.condition parameter signature uses CONDITION_DEF without the hidden comment channel.
+condition_signature = ${ condition_keyword ~ space ~ condition_identifier ~ space? ~ "(" ~ space? ~ condition_parameter ~ space? ~ (comma ~ space? ~ condition_parameter ~ space?)* ~ condition_end }
+// OpenFGAParser.conditionName in default lexer mode.
+condition_name = @{ !reserved ~ identifier_token }
+// OpenFGAParser.conditionParameter (CONDITION_DEF mode has no newline token).
+condition_parameter = { parameter_name ~ space? ~ colon ~ space? ~ parameter_type }
+// OpenFGAParser.parameterName
+parameter_name = { condition_identifier }
+// OpenFGAParser.parameterType
+parameter_type = { primitive | container ~ parameter_generic }
+// OpenFGAParser.multiLineComment
+multi_line_comment = _{ hash ~ (!newline ~ ANY)* ~ (newline ~ multi_line_comment)? }
+// OpenFGAParser.identifier
+identifier = @{ !(reserved_exclusive ~ !identifier_tail) ~ identifier_token }
+// OpenFGAParser.identifier excluded default-mode keywords.
+reserved_exclusive = _{ "and" | "or" | "but not" | "from" | "condition" | "relations" | "define" | "with" | "in" | "true" | "false" | "null" }
+// OpenFGAParser.conditionName excludes all default-mode keywords.
+reserved = _{ (reserved_exclusive | "model" | "schema" | "type" | "relation" | "module" | "extend") ~ !identifier_tail }
+// OpenFGAParser.extended_identifier gives the longest extended token priority.
+extended_identifier = @{ &(identifier_token ~ ("/" | ".")) ~ extended_token | identifier }
+// OpenFGAParser.conditionExpression accepts default-mode tokens except RBRACE.
+condition_expression = { (cel_comment | expression_token)* }
+// OpenFGAParser.conditionExpression token alternatives, including its complement branch.
+expression_token = @{ expression_condition | !condition_mode_start ~ (bytes | string | num_float | num_uint | num_int | extended_token | cel_operator | cel_literal | punctuation | dollar_expression | newline | space) }
+// OpenFGALexer.CONDITION pushes CONDITION_DEF even inside conditionExpression.
+condition_mode_start = _{ "condition" ~ !identifier_tail ~ !(("/" | ".") ~ (letter | digit | "_")) }
+// OpenFGALexer.CONDITION_DEF accepts only its tokens until CONDITION_DEF_END.
+expression_condition = _{ condition_mode_start ~ (identifier_token | space | "<" | ">" | "(" | ":" | ",")* ~ ")" }
