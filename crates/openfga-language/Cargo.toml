@@ -16,6 +16,7 @@ categories = ["authentication", "parser-implementations", "no-std"]
 openfga-model = { version = "0.1.0", path = "../openfga-model" }
 pest = { version = "2.8", default-features = false }
 pest_derive = { version = "2.8", default-features = false }
+saphyr-parser = { version = "0.4.0", default-features = false }
 thiserror = { version = "2", default-features = false }
 
 [dev-dependencies]

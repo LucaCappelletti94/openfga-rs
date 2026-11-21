@@ -1,7 +1,7 @@
-use alloc::string::String;
+use alloc::{string::String, vec::Vec};
 use core::fmt::Write as _;
 use openfga_model::{
-    AuthorizationModel, RelationReference, Userset, condition_param_type_ref::TypeName,
+    AuthorizationModel, RelationReference, SourceInfo, Userset, condition_param_type_ref::TypeName,
     relation_reference::RelationOrWildcard, userset::Userset as Rewrite,
 };
 
@@ -38,39 +38,87 @@ pub enum WriteError {
     },
 }
 
-/// Writes a single-file model as `OpenFGA` DSL without source-information comments.
+/// Writes a model as `OpenFGA` DSL without source-information comments.
 ///
 /// # Errors
 /// Returns an error for unsupported rewrites, mismatched condition names, or missing collection element types.
 pub fn write(model: &AuthorizationModel) -> Result<String, WriteError> {
+    write_model(model, false)
+}
+
+/// Writes a model as `OpenFGA` DSL with source-information comments.
+///
+/// # Errors
+/// Returns an error for unsupported rewrites, mismatched condition names, or missing collection element types.
+pub fn write_with_source_information(model: &AuthorizationModel) -> Result<String, WriteError> {
+    write_model(model, true)
+}
+
+/// Writes a model using the requested source-comment policy.
+fn write_model(
+    model: &AuthorizationModel,
+    include_source_information: bool,
+) -> Result<String, WriteError> {
     let mut output = String::from("model\n  schema ");
     output.push_str(&model.schema_version);
     output.push('\n');
-    for definition in &model.type_definitions {
+    write_types(&mut output, model, include_source_information)?;
+    write_conditions(&mut output, model, include_source_information)?;
+    Ok(output)
+}
+
+/// Writes type definitions and their relations in model order.
+fn write_types(
+    output: &mut String,
+    model: &AuthorizationModel,
+    include_source_information: bool,
+) -> Result<(), WriteError> {
+    let modular = model.type_definitions.iter().any(|definition| {
+        definition
+            .metadata
+            .as_ref()
+            .is_some_and(|metadata| !metadata.module.is_empty())
+    });
+    let definitions = modular_order(model.type_definitions.iter(), modular, |definition| {
+        let (module, source) = definition.metadata.as_ref().map_or(("", None), |metadata| {
+            (metadata.module.as_str(), metadata.source_info.as_ref())
+        });
+        source_order(&definition.r#type, module, source)
+    });
+    for definition in definitions {
         output.push_str("\ntype ");
         output.push_str(&definition.r#type);
+        let (module, source) = definition.metadata.as_ref().map_or(("", None), |metadata| {
+            (metadata.module.as_str(), metadata.source_info.as_ref())
+        });
+        write_source_comment(output, module, source, false, include_source_information);
         if !definition.relations.is_empty() {
             output.push_str("\n  relations");
         }
-        for (relation_name, rewrite) in &definition.relations {
-            let restrictions = definition
+        let relations = modular_order(definition.relations.iter(), modular, |(name, _)| {
+            let (module, source) = definition
                 .metadata
                 .as_ref()
-                .and_then(|metadata| metadata.relations.get(relation_name))
-                .map_or(&[][..], |metadata| {
-                    metadata.directly_related_user_types.as_slice()
+                .and_then(|metadata| metadata.relations.get(*name))
+                .map_or(("", None), |metadata| {
+                    (metadata.module.as_str(), metadata.source_info.as_ref())
                 });
+            source_order(name, module, source)
+        });
+        for (relation_name, rewrite) in relations {
+            let metadata = definition
+                .metadata
+                .as_ref()
+                .and_then(|metadata| metadata.relations.get(relation_name));
+            let restrictions = metadata.map_or(&[][..], |metadata| {
+                metadata.directly_related_user_types.as_slice()
+            });
             output.push_str("\n    define ");
             output.push_str(relation_name);
             output.push_str(": ");
             let mut occurrences = 0;
-            let result = write_rewrite(
-                &mut output,
-                Some(rewrite),
-                restrictions,
-                &mut occurrences,
-                false,
-            );
+            let result =
+                write_rewrite(output, Some(rewrite), restrictions, &mut occurrences, false);
             if result.is_err() || (occurrences != 0 && (occurrences != 1 || !first_direct(rewrite)))
             {
                 return Err(WriteError::UnsupportedNesting {
@@ -78,10 +126,39 @@ pub fn write(model: &AuthorizationModel) -> Result<String, WriteError> {
                     relation_name: relation_name.clone(),
                 });
             }
+            let (module, source) = metadata.map_or(("", None), |metadata| {
+                (metadata.module.as_str(), metadata.source_info.as_ref())
+            });
+            write_source_comment(output, module, source, true, include_source_information);
         }
         output.push('\n');
     }
-    for (condition_name, condition) in &model.conditions {
+    Ok(())
+}
+
+/// Writes conditions in module, file, and name order.
+fn write_conditions(
+    output: &mut String,
+    model: &AuthorizationModel,
+    include_source_information: bool,
+) -> Result<(), WriteError> {
+    let modular_conditions = model.conditions.values().any(|condition| {
+        condition
+            .metadata
+            .as_ref()
+            .is_some_and(|metadata| !metadata.module.is_empty())
+    });
+    let conditions = modular_order(
+        model.conditions.iter(),
+        modular_conditions,
+        |(name, condition)| {
+            let (module, source) = condition.metadata.as_ref().map_or(("", None), |metadata| {
+                (metadata.module.as_str(), metadata.source_info.as_ref())
+            });
+            source_order(name, module, source)
+        },
+    );
+    for (condition_name, condition) in conditions {
         if condition_name != &condition.name {
             return Err(WriteError::ConditionNameMismatch {
                 condition_name: condition_name.clone(),
@@ -97,7 +174,7 @@ pub fn write(model: &AuthorizationModel) -> Result<String, WriteError> {
             }
             output.push_str(parameter_name);
             output.push_str(": ");
-            write_type_name(&mut output, parameter.type_name);
+            write_type_name(output, parameter.type_name);
             if matches!(
                 TypeName::try_from(parameter.type_name),
                 Ok(TypeName::List | TypeName::Map)
@@ -109,17 +186,73 @@ pub fn write(model: &AuthorizationModel) -> Result<String, WriteError> {
                     }
                 })?;
                 output.push('<');
-                write_type_name(&mut output, generic.type_name);
+                write_type_name(output, generic.type_name);
                 output.push('>');
             }
         }
         output.push_str(") {\n  ");
         output.push_str(&condition.expression);
-        output.push_str("\n}\n");
+        output.push_str("\n}");
+        let (module, source) = condition.metadata.as_ref().map_or(("", None), |metadata| {
+            (metadata.module.as_str(), metadata.source_info.as_ref())
+        });
+        write_source_comment(output, module, source, false, include_source_information);
+        output.push('\n');
     }
-    Ok(output)
+    Ok(())
 }
 
+/// Orders modular entries without collecting single-file entries.
+fn modular_order<'a, Entry, Entries, Key>(
+    mut entries: Entries,
+    modular: bool,
+    key: Key,
+) -> impl Iterator<Item = Entry>
+where
+    Entries: ExactSizeIterator<Item = Entry>,
+    Key: Fn(&Entry) -> (&'a str, &'a str, &'a str),
+{
+    let mut sorted = Vec::new();
+    if modular && entries.len() > 1 {
+        sorted.extend(entries.by_ref());
+        sorted.sort_by_key(key);
+    }
+    entries.chain(sorted)
+}
+
+/// Sorts unassigned entries by name and modular entries by module, file, and name.
+fn source_order<'a>(
+    name: &'a str,
+    module: &'a str,
+    source: Option<&'a SourceInfo>,
+) -> (&'a str, &'a str, &'a str) {
+    let file = if module.is_empty() {
+        ""
+    } else {
+        source.map_or("", |source| source.file.as_str())
+    };
+    (module, file, name)
+}
+
+/// Appends available source information when requested.
+fn write_source_comment(
+    output: &mut String,
+    module: &str,
+    source: Option<&SourceInfo>,
+    relation: bool,
+    include_source_information: bool,
+) {
+    let file = source.map_or("", |source| source.file.as_str());
+    if include_source_information && (!module.is_empty() || !file.is_empty()) {
+        output.push_str(if relation { " # extended by:" } else { " #" });
+        output.push_str(" module: ");
+        output.push_str(module);
+        output.push_str(", file: ");
+        output.push_str(file);
+    }
+}
+
+/// Writes a parameter type name or its unknown numeric value.
 fn write_type_name(output: &mut String, number: i32) {
     if let Ok(name) = TypeName::try_from(number) {
         for character in name.as_str_name().trim_start_matches("TYPE_NAME_").chars() {
@@ -130,10 +263,12 @@ fn write_type_name(output: &mut String, number: i32) {
     }
 }
 
+/// Reports whether a rewrite is direct assignment.
 fn is_direct(userset: &Userset) -> bool {
     matches!(userset.userset, Some(Rewrite::This(_)))
 }
 
+/// Reports whether direct assignment occupies the first permitted position.
 fn first_direct(userset: &Userset) -> bool {
     match userset.userset.as_ref() {
         Some(Rewrite::This(_)) => true,
@@ -147,6 +282,7 @@ fn first_direct(userset: &Userset) -> bool {
     }
 }
 
+/// Writes direct-assignment type restrictions.
 fn write_restrictions(output: &mut String, restrictions: &[RelationReference]) {
     output.push('[');
     for (index, restriction) in restrictions.iter().enumerate() {
@@ -170,6 +306,7 @@ fn write_restrictions(output: &mut String, restrictions: &[RelationReference]) {
     output.push(']');
 }
 
+/// Writes a relation rewrite and counts direct assignments.
 fn write_rewrite(
     output: &mut String,
     userset: Option<&Userset>,

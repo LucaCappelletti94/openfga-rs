@@ -2,6 +2,138 @@
 use openfga_model::AuthorizationModel;
 use std::{fs, path::Path};
 
+/// Modular fixtures retain their ordering and optional source comments.
+#[test]
+fn modular_transformer_corpus() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../conformance/openfga-language/tests/data/transformer-module");
+    let mut count = 0;
+    for entry in fs::read_dir(root).expect("the module corpus is available") {
+        let directory = entry.unwrap().path();
+        let model_path = directory.join("authorization-model.json");
+        let combined_path = directory.join("combined.fga");
+        if !directory.is_dir() || !model_path.is_file() || !combined_path.is_file() {
+            continue;
+        }
+        let model: AuthorizationModel =
+            serde_json::from_slice(&fs::read(model_path).unwrap()).unwrap();
+        assert_eq!(
+            openfga_language::write(&model).unwrap().as_bytes(),
+            fs::read(combined_path).unwrap(),
+            "{}",
+            directory.display()
+        );
+        let source_path = directory.join("combined-sourceinfo.fga");
+        if source_path.is_file() {
+            assert_eq!(
+                openfga_language::write_with_source_information(&model)
+                    .unwrap()
+                    .as_bytes(),
+                fs::read(source_path).unwrap(),
+                "{}",
+                directory.display()
+            );
+        }
+        count += 1;
+    }
+    assert_ne!(count, 0, "the module corpus holds no cases");
+}
+
+/// The complex module fixture matches both Go writer modes.
+#[test]
+fn complex_module_go_writer_output() {
+    let model: AuthorizationModel = serde_json::from_str(include_str!(
+        "../../../conformance/openfga-language/tests/data/transformer-module/06-complex-module/authorization-model.json"
+    ))
+    .unwrap();
+    let expected = r"model
+  schema 1.2
+
+type page
+  relations
+    define owner: [user]
+    define space: [space]
+
+type group
+  relations
+    define member: [user]
+
+type organization
+  relations
+    define admin: [user]
+    define member: [user]
+    define can_create_page: member
+    define can_create_project: member
+
+type space
+  relations
+    define can_view_pages: member from organization
+    define organization: [organization]
+
+type user
+
+type project
+  relations
+    define organization: [organization]
+    define viewer: member from organization
+
+type ticket
+  relations
+    define owner: [user]
+    define project: [project]
+
+condition a_check(val: int) {
+  val <= 10
+}
+";
+    let expected_source = r"model
+  schema 1.2
+
+type page
+  relations
+    define owner: [user]
+    define space: [space]
+
+type group # module: bitbucket, file: bitbucket.fga
+  relations
+    define member: [user]
+
+type organization # module: bitbucket, file: bitbucket.fga
+  relations
+    define admin: [user]
+    define member: [user]
+    define can_create_page: member # extended by: module: atlassian, file: atlassian.fga
+    define can_create_project: member # extended by: module: jira, file: jira/projects.fga
+
+type space # module: confluence, file: confluence.fga
+  relations
+    define can_view_pages: member from organization
+    define organization: [organization]
+
+type user # module: core, file: core.fga
+
+type project # module: jira, file: jira/projects.fga
+  relations
+    define organization: [organization]
+    define viewer: member from organization
+
+type ticket # module: jira, file: jira/tickets.fga
+  relations
+    define owner: [user]
+    define project: [project]
+
+condition a_check(val: int) {
+  val <= 10
+} # module: org, file: org.fga
+";
+    assert_eq!(openfga_language::write(&model).unwrap(), expected);
+    assert_eq!(
+        openfga_language::write_with_source_information(&model).unwrap(),
+        expected_source
+    );
+}
+
+/// Single-file fixtures retain their canonical output.
 #[test]
 fn transformer_corpus() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -38,6 +170,7 @@ struct SyntaxCase {
     error_message: String,
 }
 
+/// Invalid rewrites retain the upstream diagnostics.
 #[test]
 fn json_syntax_corpus() {
     let source = include_str!(
@@ -58,6 +191,7 @@ fn json_syntax_corpus() {
     }
 }
 
+/// Collection parameters require an element type.
 #[test]
 fn collection_parameter_requires_element_type() {
     let mut model = AuthorizationModel::default();
@@ -85,6 +219,7 @@ fn collection_parameter_requires_element_type() {
     );
 }
 
+/// Condition names must match their map keys.
 #[test]
 fn condition_name_must_match_map_key() {
     let mut model = AuthorizationModel::default();
@@ -101,6 +236,7 @@ fn condition_name_must_match_map_key() {
     );
 }
 
+/// Unknown parameter types retain their numeric representation.
 #[test]
 fn unknown_parameter_types_are_written_as_numbers() {
     let mut model = AuthorizationModel {

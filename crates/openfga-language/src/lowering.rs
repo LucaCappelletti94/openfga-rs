@@ -14,7 +14,10 @@ use openfga_model::{
 };
 use pest::iterators::{Pair, Pairs};
 
-pub(super) fn lower(pairs: Pairs<'_, Rule>) -> Result<AuthorizationModel, ParseError> {
+/// Lowers model declarations and records extended type names.
+pub(super) fn lower(
+    pairs: Pairs<'_, Rule>,
+) -> Result<(AuthorizationModel, BTreeSet<String>), ParseError> {
     let mut model = AuthorizationModel::default();
     let mut module = String::new();
     let mut extensions = BTreeSet::new();
@@ -53,7 +56,7 @@ pub(super) fn lower(pairs: Pairs<'_, Rule>) -> Result<AuthorizationModel, ParseE
             _ => {}
         }
     }
-    Ok(model)
+    Ok((model, extensions))
 }
 
 fn tokens(pair: Pair<'_, Rule>) -> impl Iterator<Item = Pair<'_, Rule>> {
